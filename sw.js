@@ -1,6 +1,6 @@
 // Service worker: makes the app work offline.
 // Bump CACHE on every release so phones pick up the new files.
-var CACHE = "lineup-rdrm-v1";
+var CACHE = "lineup-rdrm-v2";
 var ASSETS = [
   "./", "./index.html", "./qrcode.js", "./manifest.webmanifest",
   "./fonts/archivo-latin-400-normal.woff2", "./fonts/archivo-latin-600-normal.woff2",

@@ -90,6 +90,7 @@ input[type=text]:focus{outline:none; border-color:var(--accent)}
 .tag{font-size:10px; font-weight:700; letter-spacing:.08em; padding:3px 7px; border-radius:4px; border:1.5px solid currentColor; white-space:nowrap}
 .tag.fresh{color:var(--fresh)}
 .tag.ret{color:var(--box)}
+.tag.front{color:var(--fg)}
 .tag.man{color:var(--accent)}
 .tag.warn{background:var(--fresh); border-color:var(--fresh); color:var(--surface)}
 .tag.jail{background:var(--box); border-color:var(--box); color:var(--surface)}
@@ -137,6 +138,7 @@ td.pname{display:flex; flex-direction:column; gap:4px; min-width:0}
 .chip{min-width:44px; min-height:36px; padding:0 10px; border-radius:8px; border:1.5px solid var(--line); background:transparent; font-size:12px; font-weight:700; color:var(--muted)}
 .chip[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:var(--accent-fg)}
 .chip.f[aria-pressed="true"]{background:var(--fresh); border-color:var(--fresh); color:var(--surface)}
+.chip.fr[aria-pressed="true"]{background:var(--fg); border-color:var(--fg); color:var(--surface)}
 .toggle{min-height:36px; padding:0 10px; border-radius:8px; border:1.5px solid var(--line); background:transparent; font-size:12px; font-weight:600}
 .toggle.off{border-color:var(--fresh); color:var(--fresh); background:var(--fresh-soft)}
 tr.out .pn{text-decoration:line-through; color:var(--muted)}
@@ -247,6 +249,7 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     <div id="rulesBody" hidden>
     <ul class="rules">
       <li>Toujours 1 faucheuse (Fau) maximum par mur (pivot + bloqueuses). Les faucheuses jouent environ 6 jams sur 7, à tour de rôle.</li>
+      <li>Toujours 1 Front (F) maximum par mur, pivot comprise. Si l'effectif ne le permet plus (absences, prisons), la ligne est quand même complétée, et ⇄ signale « 2 FRONT ».</li>
       <li>Chaque poste passe par ordre : pas jouée au jam d'avant, puis moins de jams joués à ce poste, puis repos le plus long.</li>
       <li>Une joueuse en prison repart au jam suivant au poste qu'elle occupait. Celle qui lui cède sa place passe en priorité ensuite.</li>
       <li>S (star pass) sur une pivot en prison : elle avait pris l'étoile, donc elle repart au jam suivant comme jammeuse. Si l'ancienne jammeuse est aussi en prison, elle repart comme bloqueuse.</li>
@@ -293,6 +296,7 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
   function player(id){ for (var i = 0; i < state.roster.length; i++) if (state.roster[i].id === id) return state.roster[i]; return null; }
   function nameOf(id){ if (!id) return "—"; var p = player(id); return p ? (p.name.trim() || "Sans nom") : "(retirée)"; }
   function isF(id){ var p = player(id); return !!(p && p.F); }
+  function isFr(id){ var p = player(id); return !!(p && p.Fr); }
   function order(id){ for (var i = 0; i < state.roster.length; i++) if (state.roster[i].id === id) return i; return 999; }
   function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
   function playersOf(l){ return [l.jammer, l.pivot].concat(l.blockers).filter(Boolean); }
@@ -336,27 +340,36 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     var jammer = fr.J[0] || rankFor("J", pool("J"), st, prev)[0] || null; if (jammer) chosen.add(jammer);
     var pivot = fr.P[0];
     if (!pivot) {
+      // the pivot counts in the wall: avoid a 2nd Fau or a 2nd Front if one already comes back from the box
       var pc = rankFor("P", pool("P"), st, prev);
-      // a fresh pivot counts in the wall: avoid her if a fresh blocker already comes back from the box
-      pivot = (fr.B.some(isF) ? pc.filter(function(n){ return !isF(n); })[0] : null) || pc[0] || null;
+      var fauB = fr.B.some(isF), frontB = fr.B.some(isFr);
+      pivot = pc.filter(function(n){ return !(fauB && isF(n)) && !(frontB && isFr(n)); })[0]
+        || pc.filter(function(n){ return !(fauB && isF(n)); })[0] || pc[0] || null;
     }
     if (pivot) chosen.add(pivot);
     var blockers = fr.B.slice(0, 3);
     fr.J.slice(1).concat(fr.P.slice(1)).forEach(function(n){ if (blockers.length < 3) blockers.push(n); });
     var slots = 3 - blockers.length;
+    function take(x){ blockers.push(x); chosen.add(x); slots--; }
+    // at most 1 Front per wall (pivot + blockers)
+    function frontOk(n){ return !isFr(n) || !(isFr(pivot) || blockers.some(isFr)); }
+    function fauRank(){ return rankFor("B", pool("B").filter(isF), st, prev); }
+    function confRank(){ return rankFor("B", pool("B").filter(function(n){ return !isF(n); }), st, prev); }
     var hasFresh = isF(pivot) || blockers.some(isF);
     var freshUsed = history.filter(function(l){ return wallOf(l).some(isF); }).length;
     var target = Math.ceil(jamNo * FRESH_PER_7 / 7);
     if (!hasFresh && slots > 0 && freshUsed < target) {
-      var f = rankFor("B", pool("B").filter(isF), st, prev)[0];
-      if (f) { blockers.push(f); chosen.add(f); slots--; hasFresh = true; }
+      var f = fauRank().filter(frontOk)[0];
+      if (f) { take(f); hasFresh = true; }
     }
-    var c = rankFor("B", pool("B").filter(function(n){ return !isF(n); }), st, prev);
-    while (slots > 0 && c.length) { var x = c.shift(); blockers.push(x); chosen.add(x); slots--; }
+    confRank().forEach(function(x){ if (slots > 0 && frontOk(x)) take(x); });
     if (slots > 0 && !hasFresh) {
-      var f2 = rankFor("B", pool("B").filter(isF), st, prev)[0];
-      if (f2) { blockers.push(f2); chosen.add(f2); slots--; }
+      var f2 = fauRank().filter(frontOk)[0];
+      if (f2) { take(f2); hasFresh = true; }
     }
+    // last resort, when there aren't enough players to respect the Front rule
+    confRank().forEach(function(x){ if (slots > 0) take(x); });
+    if (slots > 0 && !hasFresh) { var f3 = fauRank()[0]; if (f3) take(f3); }
     blockers.sort(function(a, b){ return isF(a) - isF(b); });
     while (blockers.length < 3) blockers.push(null);
     return { jam: jamNo, jammer: jammer, pivot: pivot, blockers: blockers, forced: forced.slice(), manual: [] };
@@ -374,12 +387,14 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     var other = rankFor(role, all.filter(function(n){ return !player(n)[role]; }), st, prev);
     return { ok: ok, other: other, st: st, prev: prev };
   }
-  function freshCountAfter(cur, p, n){
+  function countAfter(cur, p, n, pred){
     var copy = { jammer: cur.jammer, pivot: cur.pivot, blockers: cur.blockers.slice() };
     var q = posOf(copy, n), here = getPos(copy, p);
     setPos(copy, p, n); if (q) setPos(copy, q, here);
-    return wallOf(copy).filter(isF).length;
+    return wallOf(copy).filter(pred).length;
   }
+  function freshCountAfter(cur, p, n){ return countAfter(cur, p, n, isF); }
+  function frontCountAfter(cur, p, n){ return countAfter(cur, p, n, isFr); }
   function applySwap(cur, p, n){
     var here = getPos(cur, p), q = posOf(cur, n);
     setPos(cur, p, n);
@@ -395,7 +410,8 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     var cur = state.current, p = posOf(cur, id);
     if (p) {
       var c = candidates(cur, p);
-      var pick = c.ok.filter(function(n){ return !posOf(cur, n) && (p === "J" || freshCountAfter(cur, p, n) <= 1); })[0];
+      var free = c.ok.filter(function(n){ return !posOf(cur, n) && (p === "J" || freshCountAfter(cur, p, n) <= 1); });
+      var pick = free.filter(function(n){ return p === "J" || frontCountAfter(cur, p, n) <= 1; })[0] || free[0];
       if (pick) applySwap(cur, p, pick); else setPos(cur, p, null);
     }
     state.box = state.box.filter(function(b){ return b !== id; });
@@ -467,7 +483,8 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     $("rosterList").innerHTML = n ? state.roster.map(function(p){
       var chips = ["J", "P", "B"].map(function(k){
         return '<button type="button" class="chip" data-prole="' + k + '" data-pid="' + p.id + '" aria-pressed="' + !!p[k] + '" aria-label="' + ROLE_LABEL[k] + ' : ' + (p[k] ? 'oui' : 'non') + '">' + k + '</button>';
-      }).join("") + '<button type="button" class="chip f" data-prole="F" data-pid="' + p.id + '" aria-pressed="' + !!p.F + '" aria-label="Faucheuse : ' + (p.F ? 'oui' : 'non') + '">Fau</button>';
+      }).join("") + '<button type="button" class="chip f" data-prole="F" data-pid="' + p.id + '" aria-pressed="' + !!p.F + '" aria-label="Faucheuse : ' + (p.F ? 'oui' : 'non') + '">Fau</button>'
+        + '<button type="button" class="chip fr" data-prole="Fr" data-pid="' + p.id + '" aria-pressed="' + !!p.Fr + '" aria-label="Front : ' + (p.Fr ? 'oui' : 'non') + '" title="Front">F</button>';
       var ask = delAsk === p.id;
       return '<div class="prow"><div class="prow-top">'
         + '<input type="text" class="pinput" data-rename="' + p.id + '" value="' + esc(p.name) + '" maxlength="40" autocomplete="off" aria-label="Nom de la joueuse">'
@@ -492,6 +509,7 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     if (line.forced.indexOf(id) >= 0) t += '<span class="tag ret">SORT DE PRISON</span>';
     if ((line.manual || []).indexOf(id) >= 0) t += '<span class="tag man">MANUEL</span>';
     if (isF(id)) t += '<span class="tag fresh">FAU</span>';
+    if (isFr(id)) t += '<span class="tag front">FRONT</span>';
     return t;
   }
   function trackRow(p, cur){
@@ -514,7 +532,9 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     var s = '';
     if (on) s += '<span class="tag man">ÉCHANGE · ' + ROLE_LABEL[on[0]].toUpperCase() + '</span>';
     if (isF(n)) s += '<span class="tag fresh">FAU</span>';
+    if (isFr(n)) s += '<span class="tag front">FRONT</span>';
     if (freshCountAfter(cur, p, n) > 1) s += '<span class="tag warn">2 FAU</span>';
+    if (frontCountAfter(cur, p, n) > 1) s += '<span class="tag warn">2 FRONT</span>';
     var info = c.st[n].n + ' jam' + (c.st[n].n > 1 ? 's' : '') + (c.prev.has(n) ? ' · a joué avant' : '');
     return '<button type="button" class="cand' + (best ? ' best' : '') + '" data-pick="' + n + '"><span class="cn">' + esc(nameOf(n)) + '</span><span class="tags">' + s + '</span><span class="cs">' + info + '</span></button>';
   }
@@ -572,6 +592,7 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
         var split = ["J", "P", "B"].filter(function(k){ return st[p.id][k] > 0; }).map(function(k){ return k + " " + st[p.id][k]; }).join(" · ");
         h += '<tr class="' + (out ? 'out' : '') + '"><td class="pname"><span class="pline"><span class="pn" title="' + esc(nameOf(p.id)) + '">' + esc(nameOf(p.id)) + '</span>'
           + (p.F ? ' <span class="tag fresh">FAU</span>' : '')
+          + (p.Fr ? ' <span class="tag front">FRONT</span>' : '')
           + (onTrack.indexOf(p.id) >= 0 ? ' <span class="hint">· en piste</span>' : '') + '</span>'
           + (split ? '<span class="hint">' + split + '</span>' : '') + '</td>'
           + '<td class="num">' + st[p.id].n + '</td>'
@@ -708,7 +729,7 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
   function encodeState(withMatch){
     var idx = {};
     state.roster.forEach(function(p, i){ idx[p.id] = i; });
-    var o = { v: 1, m: state.match, r: state.roster.map(function(p){ return [p.name, (p.J ? 1 : 0) | (p.P ? 2 : 0) | (p.B ? 4 : 0) | (p.F ? 8 : 0)]; }) };
+    var o = { v: 1, m: state.match, r: state.roster.map(function(p){ return [p.name, (p.J ? 1 : 0) | (p.P ? 2 : 0) | (p.B ? 4 : 0) | (p.F ? 8 : 0) | (p.Fr ? 16 : 0)]; }) };
     if (withMatch) {
       var L = function(l){ return [l.jammer, l.pivot].concat(l.blockers).map(function(id){ return id in idx ? idx[id] : -1; }); };
       o.h = state.history.map(L);
@@ -723,7 +744,7 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     return o;
   }
   function applyImport(o){
-    var roster = o.r.map(function(x, i){ var f = +x[1] || 0; return { id: "p" + (i + 1), name: String(x[0]).slice(0, 40), J: !!(f & 1), P: !!(f & 2), B: !!(f & 4), F: !!(f & 8) }; });
+    var roster = o.r.map(function(x, i){ var f = +x[1] || 0; return { id: "p" + (i + 1), name: String(x[0]).slice(0, 40), J: !!(f & 1), P: !!(f & 2), B: !!(f & 4), F: !!(f & 8), Fr: !!(f & 16) }; });
     function id(i){ return i >= 0 && i < roster.length ? roster[i].id : null; }
     function line(a, jam){ return { jam: jam, jammer: id(a[0]), pivot: id(a[1]), blockers: [id(a[2]), id(a[3]), id(a[4])], forced: [], manual: [] }; }
     state = { v: 3, match: String(o.m || "").slice(0, 60), roster: roster, nextId: roster.length + 1, history: [], box: [], star: null, out: [] };
