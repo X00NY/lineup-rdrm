@@ -1,0 +1,821 @@
+<!doctype html><html lang="fr"><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style>
+<title>Line-Up RDRM</title>
+<meta name="theme-color" content="#1D5BD6">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Line-Up">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+@font-face{font-family:'Archivo'; font-weight:400; font-display:swap; src:url(fonts/archivo-latin-400-normal.woff2) format('woff2')}
+@font-face{font-family:'Archivo'; font-weight:600; font-display:swap; src:url(fonts/archivo-latin-600-normal.woff2) format('woff2')}
+@font-face{font-family:'Archivo'; font-weight:700; font-display:swap; src:url(fonts/archivo-latin-700-normal.woff2) format('woff2')}
+@font-face{font-family:'Archivo Black'; font-weight:400; font-display:swap; src:url(fonts/archivo-black-latin-400-normal.woff2) format('woff2')}
+</style>
+<style>
+/* Layout: one narrow phone column — header, foldable match prep (name + roster), track card (tap = prison, ⇄ = change), live next-line preview, sticky "next" bar, then team stats. */
+:root{
+  --bg:#EEF0F3; --surface:#FFFFFF; --fg:#12141A; --muted:#5A606C; --line:#D5D9E0;
+  --accent:#1D5BD6; --accent-fg:#FFFFFF; --accent-soft:#E6EEFC;
+  --fresh:#A8411A; --fresh-soft:#FBEDE6;
+  --box:#7B2FA3; --box-soft:#F3E8F9;
+  --font-display:'Archivo Black', 'Arial Black', sans-serif;
+  --font-body:'Archivo', 'Helvetica Neue', Arial, sans-serif;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0F1116; --surface:#1A1D24; --fg:#EEF0F4; --muted:#9AA1AE; --line:#2C313B;
+  --accent:#7AA2FF; --accent-fg:#0F1116; --accent-soft:#1E2A44;
+  --fresh:#F2915F; --fresh-soft:#33221A;
+  --box:#CF97F2; --box-soft:#2B2035; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0F1116; --surface:#1A1D24; --fg:#EEF0F4; --muted:#9AA1AE; --line:#2C313B;
+  --accent:#7AA2FF; --accent-fg:#0F1116; --accent-soft:#1E2A44;
+  --fresh:#F2915F; --fresh-soft:#33221A;
+  --box:#CF97F2; --box-soft:#2B2035; color-scheme:dark }
+
+*{box-sizing:border-box}
+body{background:var(--bg); color:var(--fg); font-family:var(--font-body); font-size:15px; line-height:1.4}
+.wrap{max-width:520px; margin:0 auto; padding-inline:16px; padding-block:16px 120px; display:flex; flex-direction:column; gap:18px}
+button{font:inherit; color:inherit; cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+
+.top{display:flex; justify-content:space-between; align-items:flex-end; gap:12px}
+.eyebrow{font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); overflow-wrap:anywhere}
+h1{margin:2px 0 0; font-family:var(--font-display); font-size:44px; line-height:1; letter-spacing:-.01em}
+.ghost{background:transparent; border:1.5px solid var(--line); border-radius:10px; padding:0 14px; min-height:44px; font-weight:600; font-size:14px}
+.ghost:disabled{opacity:.4; cursor:default}
+
+.card{background:var(--surface); border:1px solid var(--line); border-radius:14px; overflow:hidden}
+.card-head{display:flex; justify-content:space-between; align-items:baseline; padding:12px 16px 8px; gap:8px; flex-wrap:wrap}
+.card-head h2{margin:0; font-family:var(--font-display); font-size:15px; text-transform:uppercase; letter-spacing:.04em}
+.hint{font-size:12px; color:var(--muted)}
+
+.prep-toggle{display:flex; justify-content:space-between; align-items:center; gap:12px; width:100%; min-height:56px; padding:12px 16px; border:0; background:transparent; text-align:left}
+.prep-toggle .t{display:block; font-family:var(--font-display); font-size:15px; text-transform:uppercase; letter-spacing:.04em}
+.prep-toggle svg{width:20px; height:20px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round}
+.prep-toggle[aria-expanded="true"] svg{transform:rotate(180deg)}
+.field{display:flex; flex-direction:column; gap:6px; padding:0 16px 14px}
+.flabel{font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted)}
+.flabel-row{display:flex; justify-content:space-between; align-items:baseline; padding:0 16px 8px}
+input[type=text]{font:inherit; font-size:16px; color:var(--fg); background:var(--bg); border:1.5px solid var(--line); border-radius:10px; min-height:44px; padding:0 12px; width:100%; min-width:0}
+input[type=text]:focus{outline:none; border-color:var(--accent)}
+.prow{display:flex; flex-direction:column; gap:8px; padding:10px 16px; border-top:1px solid var(--line)}
+.prow-top{display:flex; gap:8px}
+.pinput{flex:1; font-weight:700}
+.del{min-width:44px; min-height:44px; padding:0 10px; border:1.5px solid var(--line); border-radius:10px; background:transparent; color:var(--muted); font-weight:700; white-space:nowrap}
+.del.ask{background:var(--fresh); border-color:var(--fresh); color:var(--surface)}
+.addrow{display:flex; gap:8px; padding:12px 16px; border-top:1px solid var(--line)}
+.addrow .ghost{flex-shrink:0}
+.warn{margin:0 16px 14px; padding:10px 12px; border-radius:10px; background:var(--fresh-soft); color:var(--fresh); font-size:13px; font-weight:600; display:flex; flex-direction:column; gap:4px}
+.xfer{display:flex; flex-direction:column; gap:10px; padding:14px 16px 16px; border-top:1px solid var(--line)}
+.xbtns{display:flex; gap:8px; flex-wrap:wrap}
+.xbtns .ghost{flex:1 1 140px}
+.qr{align-self:center; width:min(260px,100%); aspect-ratio:1; background:#fff; border-radius:12px; padding:10px}
+.qr svg{display:block; width:100%; height:100%}
+.import-ask{border-color:var(--accent); border-width:2px}
+.import-ask p{margin:0; padding:14px 16px 4px}
+.import-ask .xbtns{padding:10px 16px 16px}
+.go-soft{background:var(--accent); color:var(--accent-fg); border-color:var(--accent)}
+.empty-roster{padding:4px 16px 12px; font-size:13px; color:var(--muted)}
+
+.row{display:flex; align-items:stretch; border-top:1px solid var(--line)}
+.hit{display:flex; align-items:center; gap:12px; flex:1; min-width:0; min-height:56px; padding:8px 10px 8px 16px; border:0; background:transparent; text-align:left}
+.hit:disabled{cursor:default}
+.role{width:22px; flex-shrink:0; font-family:var(--font-display); font-size:16px; color:var(--muted); text-align:center}
+.name{flex:1; min-width:0; font-weight:700; font-size:18px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.name.none{color:var(--muted); font-weight:600}
+.tags{display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0}
+.tag{font-size:10px; font-weight:700; letter-spacing:.08em; padding:3px 7px; border-radius:4px; border:1.5px solid currentColor; white-space:nowrap}
+.tag.fresh{color:var(--fresh)}
+.tag.ret{color:var(--box)}
+.tag.man{color:var(--accent)}
+.tag.warn{background:var(--fresh); border-color:var(--fresh); color:var(--surface)}
+.tag.jail{background:var(--box); border-color:var(--box); color:var(--surface)}
+.row.jailed .hit{background:var(--box-soft)}
+.row.jailed .name{color:var(--box)}
+.jailbox{width:26px; height:26px; flex-shrink:0; border:2px solid var(--line); border-radius:6px; display:grid; place-items:center}
+.row.jailed .jailbox{background:var(--box); border-color:var(--box)}
+.jailbox svg{width:16px; height:16px; stroke:var(--surface); fill:none; stroke-width:3; opacity:0}
+.row.jailed .jailbox svg{opacity:1}
+.star{width:48px; flex-shrink:0; border:0; border-left:1px solid var(--line); background:var(--box-soft); color:var(--box); font-family:var(--font-display); font-size:16px}
+.star[aria-pressed="true"]{background:var(--box); color:var(--surface)}
+.swap{width:52px; flex-shrink:0; border:0; border-left:1px solid var(--line); background:transparent; display:grid; place-items:center; color:var(--muted)}
+.swap svg{width:20px; height:20px; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round}
+.swap[aria-expanded="true"]{background:var(--accent-soft); color:var(--accent)}
+
+.panel{border-top:2px solid var(--accent); background:var(--accent-soft); padding:12px 16px 14px; display:flex; flex-direction:column; gap:8px}
+.panel-head{display:flex; justify-content:space-between; align-items:center; gap:8px}
+.panel-head strong{font-size:14px}
+.cands{display:flex; flex-direction:column; gap:6px}
+.cand{display:flex; align-items:center; gap:10px; width:100%; min-height:48px; padding:6px 12px; border:1.5px solid var(--line); border-radius:10px; background:var(--surface); text-align:left}
+.cand .cn{flex:1; min-width:0; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.cand .tags{flex-direction:row}
+.cand .cs{font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+.cand.best{border-color:var(--accent)}
+.sep{font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin-top:4px}
+
+.next .row{align-items:center; gap:12px; min-height:44px; padding:6px 16px}
+.next .name{font-size:16px; font-weight:600}
+.changed{color:var(--box)}
+
+.bar{position:fixed; left:0; right:0; bottom:0; padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background:var(--bg); border-top:1px solid var(--line)}
+.bar-in{max-width:520px; margin:0 auto; display:flex; gap:10px}
+.go{flex:1; min-height:56px; border:0; border-radius:12px; background:var(--accent); color:var(--accent-fg); font-family:var(--font-display); font-size:18px; letter-spacing:.01em}
+
+table{width:100%; border-collapse:collapse; font-size:14px; font-variant-numeric:tabular-nums}
+td{padding:8px 16px; border-top:1px solid var(--line); vertical-align:middle}
+td.num{text-align:right; font-weight:700; font-size:16px; padding-inline:4px}
+table{table-layout:fixed}
+td.pname{display:flex; flex-direction:column; gap:4px; min-width:0}
+.pline{display:flex; align-items:center; gap:6px; min-width:0}
+.pn{min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-weight:600}
+.pline .tag,.pline .hint{flex-shrink:0}
+.grp td{background:var(--bg); font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); padding:6px 16px}
+.chips{display:flex; gap:6px; align-items:center; flex-wrap:wrap}
+.chip{min-width:44px; min-height:36px; padding:0 10px; border-radius:8px; border:1.5px solid var(--line); background:transparent; font-size:12px; font-weight:700; color:var(--muted)}
+.chip[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:var(--accent-fg)}
+.chip.f[aria-pressed="true"]{background:var(--fresh); border-color:var(--fresh); color:var(--surface)}
+.toggle{min-height:36px; padding:0 10px; border-radius:8px; border:1.5px solid var(--line); background:transparent; font-size:12px; font-weight:600}
+.toggle.off{border-color:var(--fresh); color:var(--fresh); background:var(--fresh-soft)}
+tr.out .pn{text-decoration:line-through; color:var(--muted)}
+
+.fold{display:flex; justify-content:space-between; align-items:center; gap:12px; width:100%; min-height:52px; padding:12px 16px; border:0; background:transparent; text-align:left}
+.fold .t{font-family:var(--font-display); font-size:15px; text-transform:uppercase; letter-spacing:.04em}
+.fold .r{display:flex; align-items:center; gap:10px}
+.fold svg,.prep-toggle svg{width:20px; height:20px; flex-shrink:0; fill:none; stroke:currentColor; stroke-width:2.2; stroke-linecap:round; stroke-linejoin:round}
+.fold[aria-expanded="true"] svg{transform:rotate(180deg)}
+.rules{font-size:13px; color:var(--muted); padding:0 16px 14px 34px; margin:0; display:flex; flex-direction:column; gap:6px}
+.reset{display:flex; gap:10px; align-items:center; flex-wrap:wrap; padding:0 16px 16px}
+.danger{border-color:var(--fresh); color:var(--fresh)}
+@media (prefers-reduced-motion: no-preference){ .hit, .cand{transition:background .15s} .prep-toggle svg,.fold svg{transition:transform .2s} }
+</style></head><body>
+
+<div class="wrap">
+  <section class="card import-ask" id="importAsk" hidden role="alertdialog" aria-labelledby="importText">
+    <p id="importText"></p>
+    <div class="xbtns">
+      <button type="button" class="ghost go-soft" id="importYes">Oui, importer</button>
+      <button type="button" class="ghost" id="importNo">Non</button>
+    </div>
+  </section>
+
+  <div class="top">
+    <div>
+      <div class="eyebrow" id="sub">Match</div>
+      <h1 id="jamTitle">Jam 1</h1>
+    </div>
+    <button class="ghost" id="undo" type="button">Annuler</button>
+  </div>
+
+  <section class="card" aria-label="Préparer le match">
+    <button type="button" class="prep-toggle" id="prepToggle" aria-expanded="true" aria-controls="prepBody">
+      <span><span class="t">Préparer le match</span><span class="hint" id="prepSummary"></span></span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div id="prepBody">
+      <label class="field">
+        <span class="flabel">Nom du match</span>
+        <input type="text" id="matchName" maxlength="60" autocomplete="off" placeholder="ex. Match à Amiens">
+      </label>
+      <div class="flabel-row"><span class="flabel">Joueuses</span><span class="hint" id="rosterCount"></span></div>
+      <div id="rosterList"></div>
+      <form class="addrow" id="addForm">
+        <input type="text" id="newName" maxlength="40" autocomplete="off" placeholder="Nom de derby" aria-label="Nom de la nouvelle joueuse">
+        <button class="ghost" type="submit">Ajouter</button>
+      </form>
+      <div id="prepWarn"></div>
+      <div class="xfer">
+        <span class="flabel">Passer le relais à un autre téléphone</span>
+        <div class="xbtns">
+          <button type="button" class="ghost" data-share="roster">Roster seul</button>
+          <button type="button" class="ghost" data-share="match">Roster + match en cours</button>
+        </div>
+        <div id="shareOut" hidden>
+          <div class="xfer" style="padding:0; border:0">
+            <div class="qr" id="qr"></div>
+            <span class="hint" id="shareHint"></span>
+            <input type="text" id="shareLink" readonly aria-label="Lien de transfert">
+            <div class="xbtns">
+              <button type="button" class="ghost" id="shareSend" hidden>Envoyer…</button>
+              <button type="button" class="ghost" id="copyLink">Copier le lien</button>
+              <button type="button" class="ghost" id="shareClose">Fermer</button>
+            </div>
+          </div>
+        </div>
+        <form class="addrow" id="importForm" style="border:0; padding:0">
+          <input type="text" id="importCode" autocomplete="off" placeholder="Coller un lien reçu" aria-label="Lien ou code de transfert reçu">
+          <button class="ghost" type="submit">Importer</button>
+        </form>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="h-track">
+    <div class="card-head">
+      <h2 id="h-track">Sur la piste</h2>
+      <span class="hint">Nom = prison · S = star pass · ⇄ = changer</span>
+    </div>
+    <div id="track"></div>
+  </section>
+
+  <section class="card next" aria-labelledby="h-next">
+    <div class="card-head">
+      <h2 id="h-next">Ligne suivante</h2>
+      <span class="hint" id="nextHint">si personne en prison</span>
+    </div>
+    <div id="next"></div>
+  </section>
+
+  <section class="card" aria-label="Équipe">
+    <button type="button" class="fold" data-fold="teamBody" aria-expanded="true" aria-controls="teamBody">
+      <span class="t">Équipe</span><span class="r"><span class="hint">jams joués · dispo</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span>
+    </button>
+    <div id="teamBody">
+      <table>
+        <colgroup><col><col style="width:44px"><col style="width:96px"></colgroup>
+        <tbody id="stats"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" aria-label="Règles appliquées">
+    <button type="button" class="fold" data-fold="rulesBody" aria-expanded="false" aria-controls="rulesBody">
+      <span class="t">Règles appliquées</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div id="rulesBody" hidden>
+    <ul class="rules">
+      <li>Toujours 1 faucheuse (Fau) maximum par mur (pivot + bloqueuses). Les faucheuses jouent environ 6 jams sur 7, à tour de rôle.</li>
+      <li>Chaque poste passe par ordre : pas jouée au jam d'avant, puis moins de jams joués à ce poste, puis repos le plus long.</li>
+      <li>Une joueuse en prison repart au jam suivant au poste qu'elle occupait. Celle qui lui cède sa place passe en priorité ensuite.</li>
+      <li>S (star pass) sur une pivot en prison : elle avait pris l'étoile, donc elle repart au jam suivant comme jammeuse. Si l'ancienne jammeuse est aussi en prison, elle repart comme bloqueuse.</li>
+      <li>J, P et B dans « Préparer le match » disent à quels postes une joueuse entre dans la rotation automatique. Ajoute J à une bloqueuse s'il ne reste que 2 jammeuses.</li>
+      <li>⇄ remplace une joueuse sur la ligne en cours, à la main. Choisir une joueuse déjà sur la piste échange leurs postes.</li>
+      <li>« Absente » retire une joueuse de la rotation. Si elle est sur la ligne en cours, la meilleure remplaçante prend sa place. Pareil si on la retire du roster.</li>
+    </ul>
+    <div class="reset">
+      <button class="ghost danger" id="resetAsk" type="button">Nouveau match</button>
+      <span id="resetConfirm" hidden>
+        <span class="hint">Effacer les jams ? Le roster est gardé.</span>
+        <button class="ghost danger" id="resetYes" type="button">Oui, effacer</button>
+        <button class="ghost" id="resetNo" type="button">Non</button>
+      </span>
+    </div>
+    </div>
+  </section>
+</div>
+
+<div class="bar">
+  <div class="bar-in">
+    <button class="go" id="go" type="button">Fin du jam → ligne suivante</button>
+  </div>
+</div>
+
+<script src="qrcode.js"></script>
+<script>
+(function(){
+  var KEY = "lineup-derby-v3", OLD_KEY = "lineup-amiens-v2";
+  var FRESH_PER_7 = 6;
+  var ROLE_LABEL = { J: "Jammeuse", P: "Pivot", B: "Bloqueuse" };
+  function roleCell(k){ return '<span class="role" title="' + ROLE_LABEL[k] + '" aria-label="' + ROLE_LABEL[k] + '">' + k + '</span>'; }
+  var SEED = {
+    match: "Match à Amiens",
+    jammers: ["Redrum", "Motta", "PlumpQueen"],
+    pivots: ["Clatapulte", "Seg"],
+    confirmed: ["ChatonBrutal", "NonoPasaran", "Mad'Laine", "Mel Give Some", "Mrs Bungle"],
+    fresh: ["Freddie Stardust", "Coronasaurus", "Kill Boulette"]
+  };
+
+  var state, swapFor = null, delAsk = null;
+
+  // ---------- roster helpers (lines store player ids, so renaming is safe) ----------
+  function player(id){ for (var i = 0; i < state.roster.length; i++) if (state.roster[i].id === id) return state.roster[i]; return null; }
+  function nameOf(id){ if (!id) return "—"; var p = player(id); return p ? (p.name.trim() || "Sans nom") : "(retirée)"; }
+  function isF(id){ var p = player(id); return !!(p && p.F); }
+  function order(id){ for (var i = 0; i < state.roster.length; i++) if (state.roster[i].id === id) return i; return 999; }
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]; }); }
+  function playersOf(l){ return [l.jammer, l.pivot].concat(l.blockers).filter(Boolean); }
+  function wallOf(l){ return [l.pivot].concat(l.blockers).filter(Boolean); }
+  function roleOf(l, n){ return l.jammer === n ? "J" : l.pivot === n ? "P" : "B"; }
+  function posOf(l, n){ if (!n) return null; if (l.jammer === n) return "J"; if (l.pivot === n) return "P"; var i = l.blockers.indexOf(n); return i >= 0 ? "B" + i : null; }
+  function getPos(l, p){ return p === "J" ? l.jammer : p === "P" ? l.pivot : l.blockers[+p.slice(1)]; }
+  function setPos(l, p, n){ if (p === "J") l.jammer = n; else if (p === "P") l.pivot = n; else l.blockers[+p.slice(1)] = n; }
+  function positions(){ return ["J", "P", "B0", "B1", "B2"]; }
+
+  function stats(history){
+    var st = {};
+    state.roster.forEach(function(p){ st[p.id] = { n: 0, last: -99, J: 0, P: 0, B: 0 }; });
+    history.forEach(function(l){ playersOf(l).forEach(function(id){ if (st[id]) { st[id].n++; st[id].last = l.jam; st[id][roleOf(l, id)]++; } }); });
+    return st;
+  }
+  function rankFor(role, cands, st, prev){
+    return cands.slice().sort(function(a, b){
+      return (prev.has(a) - prev.has(b))
+        || (role === "B" ? 0 : st[a][role] - st[b][role])
+        || (st[a].n - st[b].n)
+        || (st[a].last - st[b].last)
+        || (order(a) - order(b));
+    });
+  }
+
+  function compute(history, forced, out, star){
+    var jamNo = history.length + 1;
+    var st = stats(history);
+    var last = history[history.length - 1];
+    var prev = new Set(last ? playersOf(last) : []);
+    forced = forced.filter(function(id){ return player(id) && out.indexOf(id) < 0; });
+    var chosen = new Set(forced);
+    var fr = { J: [], P: [], B: [] };
+    forced.forEach(function(n){
+      var r = !last ? "B" : (star && n === star && last.pivot === n) ? "J" : (star && last.jammer === n) ? "B" : roleOf(last, n);
+      fr[r].push(n);
+    });
+    function pool(role){ return state.roster.filter(function(p){ return p[role] && out.indexOf(p.id) < 0 && !chosen.has(p.id); }).map(function(p){ return p.id; }); }
+
+    var jammer = fr.J[0] || rankFor("J", pool("J"), st, prev)[0] || null; if (jammer) chosen.add(jammer);
+    var pivot = fr.P[0];
+    if (!pivot) {
+      var pc = rankFor("P", pool("P"), st, prev);
+      // a fresh pivot counts in the wall: avoid her if a fresh blocker already comes back from the box
+      pivot = (fr.B.some(isF) ? pc.filter(function(n){ return !isF(n); })[0] : null) || pc[0] || null;
+    }
+    if (pivot) chosen.add(pivot);
+    var blockers = fr.B.slice(0, 3);
+    fr.J.slice(1).concat(fr.P.slice(1)).forEach(function(n){ if (blockers.length < 3) blockers.push(n); });
+    var slots = 3 - blockers.length;
+    var hasFresh = isF(pivot) || blockers.some(isF);
+    var freshUsed = history.filter(function(l){ return wallOf(l).some(isF); }).length;
+    var target = Math.ceil(jamNo * FRESH_PER_7 / 7);
+    if (!hasFresh && slots > 0 && freshUsed < target) {
+      var f = rankFor("B", pool("B").filter(isF), st, prev)[0];
+      if (f) { blockers.push(f); chosen.add(f); slots--; hasFresh = true; }
+    }
+    var c = rankFor("B", pool("B").filter(function(n){ return !isF(n); }), st, prev);
+    while (slots > 0 && c.length) { var x = c.shift(); blockers.push(x); chosen.add(x); slots--; }
+    if (slots > 0 && !hasFresh) {
+      var f2 = rankFor("B", pool("B").filter(isF), st, prev)[0];
+      if (f2) { blockers.push(f2); chosen.add(f2); slots--; }
+    }
+    blockers.sort(function(a, b){ return isF(a) - isF(b); });
+    while (blockers.length < 3) blockers.push(null);
+    return { jam: jamNo, jammer: jammer, pivot: pivot, blockers: blockers, forced: forced.slice(), manual: [] };
+  }
+
+  // Candidates to replace position p of line cur: allowed for the role first, then everyone else.
+  function candidates(cur, p){
+    var role = p[0];
+    var st = stats(state.history);
+    var last = state.history[state.history.length - 1];
+    var prev = new Set(last ? playersOf(last) : []);
+    var here = getPos(cur, p);
+    var all = state.roster.map(function(x){ return x.id; }).filter(function(n){ return n !== here && state.out.indexOf(n) < 0; });
+    var ok = rankFor(role, all.filter(function(n){ return player(n)[role]; }), st, prev);
+    var other = rankFor(role, all.filter(function(n){ return !player(n)[role]; }), st, prev);
+    return { ok: ok, other: other, st: st, prev: prev };
+  }
+  function freshCountAfter(cur, p, n){
+    var copy = { jammer: cur.jammer, pivot: cur.pivot, blockers: cur.blockers.slice() };
+    var q = posOf(copy, n), here = getPos(copy, p);
+    setPos(copy, p, n); if (q) setPos(copy, q, here);
+    return wallOf(copy).filter(isF).length;
+  }
+  function applySwap(cur, p, n){
+    var here = getPos(cur, p), q = posOf(cur, n);
+    setPos(cur, p, n);
+    if (q) setPos(cur, q, here);
+    else if (here) {
+      state.box = state.box.filter(function(b){ return b !== here; });
+      cur.forced = cur.forced.filter(function(b){ return b !== here; });
+    }
+    [n, here].forEach(function(x){ if (x && playersOf(cur).indexOf(x) >= 0 && cur.manual.indexOf(x) < 0) cur.manual.push(x); });
+  }
+  // Takes a player off the current line and puts the best replacement in her spot.
+  function replaceOnLine(id){
+    var cur = state.current, p = posOf(cur, id);
+    if (p) {
+      var c = candidates(cur, p);
+      var pick = c.ok.filter(function(n){ return !posOf(cur, n) && (p === "J" || freshCountAfter(cur, p, n) <= 1); })[0];
+      if (pick) applySwap(cur, p, pick); else setPos(cur, p, null);
+    }
+    state.box = state.box.filter(function(b){ return b !== id; });
+    cur.forced = cur.forced.filter(function(b){ return b !== id; });
+    cur.manual = cur.manual.filter(function(b){ return b !== id; });
+  }
+
+  // ---------- state ----------
+  function seedRoster(roles){
+    var list = [], id = 1;
+    SEED.jammers.concat(SEED.pivots, SEED.confirmed, SEED.fresh).forEach(function(n){
+      var r = roles && roles[n];
+      list.push({ id: "p" + id++, name: n,
+        J: r ? !!r.J : SEED.jammers.indexOf(n) >= 0,
+        P: r ? !!r.P : SEED.pivots.indexOf(n) >= 0,
+        B: r ? !!r.B : SEED.confirmed.indexOf(n) >= 0 || SEED.fresh.indexOf(n) >= 0,
+        F: SEED.fresh.indexOf(n) >= 0 });
+    });
+    return { roster: list, nextId: id };
+  }
+  function migrate(o){
+    var seed = seedRoster(o.roles), ids = {};
+    seed.roster.forEach(function(p){ ids[p.name] = p.id; });
+    function m(n){ return ids[n] || null; }
+    function line(l){
+      var b = (l.blockers || []).map(m); while (b.length < 3) b.push(null);
+      return { jam: l.jam, jammer: m(l.jammer), pivot: m(l.pivot), blockers: b,
+        forced: (l.forced || []).map(m).filter(Boolean), manual: (l.manual || []).map(m).filter(Boolean) };
+    }
+    state = { v: 3, match: SEED.match, roster: seed.roster, nextId: seed.nextId,
+      history: o.history.map(line), current: line(o.current),
+      box: (o.box || []).map(m).filter(Boolean), out: (o.out || []).map(m).filter(Boolean) };
+  }
+  function load(){
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) { var s = JSON.parse(raw); if (s && s.v === 3 && Array.isArray(s.roster) && s.current && Array.isArray(s.history)) { state = s; return; } }
+    } catch (e) {}
+    try {
+      var old = localStorage.getItem(OLD_KEY);
+      if (old) { var o = JSON.parse(old); if (o && o.current && Array.isArray(o.history) && o.roles) { migrate(o); return; } }
+    } catch (e) {}
+    var seed = seedRoster();
+    state = { v: 3, match: SEED.match, roster: seed.roster, nextId: seed.nextId, history: [], box: [], out: [] };
+    state.current = compute([], [], []);
+  }
+  function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  // With no jam played yet, the current line follows roster changes automatically.
+  function refreshIfUntouched(){
+    var cur = state.current;
+    if (!state.history.length && !cur.manual.length && !state.box.length) state.current = compute([], [], state.out);
+  }
+  load();
+
+  var $ = function(id){ return document.getElementById(id); };
+  var checkSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
+  var swapSvg = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7"/></svg>';
+
+  // ---------- prep section ----------
+  function setPrepOpen(open){ $("prepBody").hidden = !open; $("prepToggle").setAttribute("aria-expanded", open); }
+  function prepSummary(){
+    var n = state.roster.length;
+    $("prepSummary").textContent = (state.match.trim() || "Sans nom") + " · " + n + " joueuse" + (n > 1 ? "s" : "");
+  }
+  function renderPrep(){
+    $("matchName").value = state.match;
+    var n = state.roster.length;
+    $("rosterCount").textContent = n + " joueuse" + (n > 1 ? "s" : "");
+    $("rosterList").innerHTML = n ? state.roster.map(function(p){
+      var chips = ["J", "P", "B"].map(function(k){
+        return '<button type="button" class="chip" data-prole="' + k + '" data-pid="' + p.id + '" aria-pressed="' + !!p[k] + '" aria-label="' + ROLE_LABEL[k] + ' : ' + (p[k] ? 'oui' : 'non') + '">' + k + '</button>';
+      }).join("") + '<button type="button" class="chip f" data-prole="F" data-pid="' + p.id + '" aria-pressed="' + !!p.F + '" aria-label="Faucheuse : ' + (p.F ? 'oui' : 'non') + '">Fau</button>';
+      var ask = delAsk === p.id;
+      return '<div class="prow"><div class="prow-top">'
+        + '<input type="text" class="pinput" data-rename="' + p.id + '" value="' + esc(p.name) + '" maxlength="40" autocomplete="off" aria-label="Nom de la joueuse">'
+        + '<button type="button" class="del' + (ask ? ' ask' : '') + '" data-del="' + p.id + '" aria-label="' + (ask ? 'Confirmer : retirer ' : 'Retirer ') + esc(nameOf(p.id)) + '">' + (ask ? 'Retirer ?' : '×') + '</button>'
+        + '</div><div class="chips">' + chips + '</div></div>';
+    }).join("") : '<div class="empty-roster">Aucune joueuse. Ajoute-les une par une ci-dessous.</div>';
+
+    var avail = state.roster.filter(function(p){ return state.out.indexOf(p.id) < 0; });
+    var w = [];
+    if (!avail.some(function(p){ return p.J; })) w.push("Aucune jammeuse disponible : coche J pour au moins une joueuse.");
+    if (!avail.some(function(p){ return p.P; })) w.push("Aucune pivot disponible : coche P pour au moins une joueuse.");
+    if (avail.filter(function(p){ return p.B; }).length < 3) w.push("Moins de 3 bloqueuses disponibles : coche B pour plus de joueuses.");
+    if (avail.length < 5) w.push("Il faut au moins 5 joueuses disponibles pour une ligne complète.");
+    if (n > 15) w.push("Plus de 15 joueuses : la limite WFTDA d'un roster de match est 15.");
+    $("prepWarn").innerHTML = w.length ? '<div class="warn" role="status">' + w.map(function(x){ return '<span>' + esc(x) + '</span>'; }).join("") + '</div>' : "";
+    prepSummary();
+  }
+
+  // ---------- main ----------
+  function tagsFor(line, id){
+    var t = "";
+    if (line.forced.indexOf(id) >= 0) t += '<span class="tag ret">SORT DE PRISON</span>';
+    if ((line.manual || []).indexOf(id) >= 0) t += '<span class="tag man">MANUEL</span>';
+    if (isF(id)) t += '<span class="tag fresh">FAU</span>';
+    return t;
+  }
+  function trackRow(p, cur){
+    var id = getPos(cur, p);
+    var jailed = !!id && state.box.indexOf(id) >= 0;
+    var starred = jailed && p === "P" && state.star === id;
+    var tags = id ? tagsFor(cur, id) + (jailed ? '<span class="tag jail">' + (starred ? 'PRISON · J' : 'PRISON') + '</span>' : '') : '';
+    var open = swapFor === p;
+    var html = '<div class="row' + (jailed ? ' jailed' : '') + '">'
+      + '<button type="button" class="hit"' + (id ? ' data-jail="' + id + '" aria-pressed="' + jailed + '"' : ' disabled') + '>'
+      + roleCell(p[0]) + '<span class="name' + (id ? '' : ' none') + '"' + (id ? ' title="' + esc(nameOf(id)) + '"' : '') + '>' + (id ? esc(nameOf(id)) : 'Personne') + '</span>'
+      + '<span class="tags">' + tags + '</span>' + (id ? '<span class="jailbox">' + checkSvg + '</span>' : '') + '</button>'
+      + (jailed && p === "P" ? '<button type="button" class="star" data-star="' + id + '" aria-pressed="' + starred + '" aria-label="Star pass : en prison comme jammeuse">S</button>' : '')
+      + '<button type="button" class="swap" data-swap="' + p + '" aria-expanded="' + open + '" aria-label="' + (id ? 'Changer ' + esc(nameOf(id)) : 'Choisir une ' + ROLE_LABEL[p[0]].toLowerCase()) + '">' + swapSvg + '</button></div>';
+    if (open) html += panel(cur, p);
+    return html;
+  }
+  function candBtn(cur, p, n, c, best){
+    var on = posOf(cur, n);
+    var s = '';
+    if (on) s += '<span class="tag man">ÉCHANGE · ' + ROLE_LABEL[on[0]].toUpperCase() + '</span>';
+    if (isF(n)) s += '<span class="tag fresh">FAU</span>';
+    if (freshCountAfter(cur, p, n) > 1) s += '<span class="tag warn">2 FAU</span>';
+    var info = c.st[n].n + ' jam' + (c.st[n].n > 1 ? 's' : '') + (c.prev.has(n) ? ' · a joué avant' : '');
+    return '<button type="button" class="cand' + (best ? ' best' : '') + '" data-pick="' + n + '"><span class="cn">' + esc(nameOf(n)) + '</span><span class="tags">' + s + '</span><span class="cs">' + info + '</span></button>';
+  }
+  function panel(cur, p){
+    var c = candidates(cur, p), here = getPos(cur, p);
+    var title = here ? 'Remplacer ' + esc(nameOf(here)) + ' (' + ROLE_LABEL[p[0]].toLowerCase() + ') par :' : 'Placer une ' + ROLE_LABEL[p[0]].toLowerCase() + ' :';
+    var h = '<div class="panel"><div class="panel-head"><strong>' + title + '</strong>'
+      + '<button type="button" class="ghost" data-close="1">Fermer</button></div><div class="cands">';
+    c.ok.forEach(function(n, i){ h += candBtn(cur, p, n, c, i === 0); });
+    if (c.other.length) {
+      h += '<div class="sep">Autres postes habituels</div>';
+      c.other.forEach(function(n){ h += candBtn(cur, p, n, c, false); });
+    }
+    if (!c.ok.length && !c.other.length) h += '<span class="hint">Personne de disponible.</span>';
+    return h + '</div></div>';
+  }
+  function nextRow(p, line, base){
+    var id = getPos(line, p);
+    var changed = id && base && playersOf(base).indexOf(id) < 0;
+    return '<div class="row">' + roleCell(p[0]) + '<span class="name' + (changed ? ' changed' : '') + (id ? '' : ' none') + '"' + (id ? ' title="' + esc(nameOf(id)) + '"' : '') + '>' + (id ? esc(nameOf(id)) : 'Personne') + '</span><span class="tags">' + (id ? tagsFor(line, id) : '') + '</span></div>';
+  }
+
+  function renderMain(){
+    var cur = state.current;
+    if (state.star && (state.star !== cur.pivot || state.box.indexOf(state.star) < 0)) state.star = null;
+    var played = state.history.length;
+    $("jamTitle").textContent = "Jam " + cur.jam;
+    $("sub").textContent = (state.match.trim() || "Match") + " · " + played + " jam" + (played > 1 ? "s" : "") + " joué" + (played > 1 ? "s" : "");
+    $("undo").disabled = played === 0;
+
+    $("track").innerHTML = positions().map(function(p){ return trackRow(p, cur); }).join("");
+
+    var hist = state.history.concat([cur]);
+    var next = compute(hist, state.box, state.out, state.star);
+    var base = state.box.length ? compute(hist, [], state.out) : null;
+    $("next").innerHTML = positions().map(function(p){ return nextRow(p, next, base); }).join("");
+    $("nextHint").textContent = state.box.length ? state.box.length + " en prison pris en compte" : "si personne en prison";
+    $("go").textContent = state.box.length ? "Fin du jam · " + state.box.length + " en prison →" : "Fin du jam → ligne suivante";
+
+    var st = stats(state.history);
+    var onTrack = playersOf(cur);
+    var groups = [
+      ["Jammeuses", function(p){ return p.J; }],
+      ["Pivots", function(p){ return !p.J && p.P; }],
+      ["Bloqueuses", function(p){ return !p.J && !p.P && p.B; }],
+      ["Sans poste", function(p){ return !p.J && !p.P && !p.B; }]
+    ];
+    var h = "";
+    groups.forEach(function(g){
+      var list = state.roster.filter(g[1]);
+      if (!list.length) return;
+      h += '<tr class="grp"><td colspan="3">' + g[0] + '</td></tr>';
+      list.forEach(function(p){
+        var out = state.out.indexOf(p.id) >= 0;
+        var split = ["J", "P", "B"].filter(function(k){ return st[p.id][k] > 0; }).map(function(k){ return k + " " + st[p.id][k]; }).join(" · ");
+        h += '<tr class="' + (out ? 'out' : '') + '"><td class="pname"><span class="pline"><span class="pn" title="' + esc(nameOf(p.id)) + '">' + esc(nameOf(p.id)) + '</span>'
+          + (p.F ? ' <span class="tag fresh">FAU</span>' : '')
+          + (onTrack.indexOf(p.id) >= 0 ? ' <span class="hint">· en piste</span>' : '') + '</span>'
+          + (split ? '<span class="hint">' + split + '</span>' : '') + '</td>'
+          + '<td class="num">' + st[p.id].n + '</td>'
+          + '<td style="text-align:right"><button type="button" class="toggle' + (out ? ' off' : '') + '" data-out="' + p.id + '">' + (out ? 'Absente' : 'Dispo') + '</button></td></tr>';
+      });
+    });
+    $("stats").innerHTML = h || '<tr><td class="hint">Ajoute des joueuses dans « Préparer le match ».</td></tr>';
+    prepSummary();
+    save();
+  }
+  function renderAll(){ renderPrep(); renderMain(); }
+
+  var wake = null;
+  function keepAwake(){
+    if (wake || !navigator.wakeLock) return;
+    navigator.wakeLock.request("screen").then(function(w){ wake = w; w.addEventListener("release", function(){ wake = null; }); }).catch(function(){});
+  }
+  document.addEventListener("visibilitychange", function(){ if (document.visibilityState === "visible") { wake = null; keepAwake(); } });
+
+  // ---------- prep events ----------
+  $("prepToggle").addEventListener("click", function(){ setPrepOpen($("prepBody").hidden); });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-fold]"), function(b){
+    b.addEventListener("click", function(){
+      var body = $(b.getAttribute("data-fold")), open = body.hidden;
+      body.hidden = !open; b.setAttribute("aria-expanded", open);
+    });
+  });
+  $("matchName").addEventListener("input", function(e){ state.match = e.target.value; renderMain(); });
+  $("rosterList").addEventListener("input", function(e){
+    var id = e.target.getAttribute("data-rename");
+    if (!id) return;
+    var p = player(id); if (p) { p.name = e.target.value; renderMain(); }
+  });
+  $("rosterList").addEventListener("change", function(e){
+    var id = e.target.getAttribute("data-rename");
+    var p = id && player(id); if (p) { p.name = p.name.trim(); e.target.value = p.name; renderMain(); }
+  });
+  $("rosterList").addEventListener("click", function(e){
+    var t;
+    if ((t = e.target.closest("[data-prole]"))) {
+      var p = player(t.getAttribute("data-pid")), k = t.getAttribute("data-prole");
+      if (p) p[k] = !p[k];
+      delAsk = null; refreshIfUntouched();
+    } else if ((t = e.target.closest("[data-del]"))) {
+      var id = t.getAttribute("data-del");
+      if (delAsk !== id) { delAsk = id; renderPrep(); return; }
+      delAsk = null; swapFor = null;
+      replaceOnLine(id);
+      state.roster = state.roster.filter(function(x){ return x.id !== id; });
+      state.out = state.out.filter(function(x){ return x !== id; });
+      refreshIfUntouched();
+    } else return;
+    renderAll();
+  });
+  $("addForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var input = $("newName"), name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    state.roster.push({ id: "p" + state.nextId++, name: name, J: false, P: false, B: true, F: false });
+    input.value = ""; delAsk = null;
+    refreshIfUntouched();
+    renderAll();
+    input.focus();
+  });
+
+  // ---------- match events ----------
+  $("track").addEventListener("click", function(e){
+    keepAwake();
+    var t;
+    if ((t = e.target.closest("[data-jail]"))) {
+      var id = t.getAttribute("data-jail");
+      var i = state.box.indexOf(id);
+      if (i >= 0) state.box.splice(i, 1); else state.box.push(id);
+    } else if ((t = e.target.closest("[data-star]"))) {
+      var sid = t.getAttribute("data-star");
+      state.star = state.star === sid ? null : sid;
+    } else if ((t = e.target.closest("[data-swap]"))) {
+      var p = t.getAttribute("data-swap");
+      swapFor = swapFor === p ? null : p;
+    } else if ((t = e.target.closest("[data-pick]"))) {
+      applySwap(state.current, swapFor, t.getAttribute("data-pick"));
+      swapFor = null;
+    } else if (e.target.closest("[data-close]")) {
+      swapFor = null;
+    } else return;
+    renderMain();
+  });
+
+  $("go").addEventListener("click", function(){
+    keepAwake();
+    state.history.push(state.current);
+    state.current = compute(state.history, state.box, state.out, state.star);
+    state.box = []; state.star = null; swapFor = null;
+    if (state.history.length === 1) setPrepOpen(false);
+    renderMain();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  });
+
+  $("undo").addEventListener("click", function(){
+    if (!state.history.length) return;
+    state.current = state.history.pop();
+    state.current.manual = state.current.manual || [];
+    state.box = []; state.star = null; swapFor = null;
+    renderMain();
+  });
+
+  $("stats").addEventListener("click", function(e){
+    var t = e.target.closest("[data-out]");
+    if (!t) return;
+    var id = t.getAttribute("data-out");
+    var i = state.out.indexOf(id);
+    if (i >= 0) { state.out.splice(i, 1); refreshIfUntouched(); }
+    else { state.out.push(id); replaceOnLine(id); }
+    swapFor = null;
+    renderAll();
+  });
+
+  $("resetAsk").addEventListener("click", function(){ $("resetConfirm").hidden = false; $("resetAsk").hidden = true; });
+  $("resetNo").addEventListener("click", function(){ $("resetConfirm").hidden = true; $("resetAsk").hidden = false; });
+  $("resetYes").addEventListener("click", function(){
+    state.history = []; state.box = []; state.star = null; state.out = []; state.match = "";
+    state.current = compute([], [], []);
+    swapFor = null; delAsk = null;
+    $("resetConfirm").hidden = true; $("resetAsk").hidden = false;
+    renderAll();
+    setPrepOpen(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    $("matchName").focus();
+  });
+
+  // ---------- transfer between phones ----------
+  function b64url(str){ return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
+  function unb64url(str){ str = str.replace(/-/g, "+").replace(/_/g, "/"); while (str.length % 4) str += "="; return decodeURIComponent(escape(atob(str))); }
+  function encodeState(withMatch){
+    var idx = {};
+    state.roster.forEach(function(p, i){ idx[p.id] = i; });
+    var o = { v: 1, m: state.match, r: state.roster.map(function(p){ return [p.name, (p.J ? 1 : 0) | (p.P ? 2 : 0) | (p.B ? 4 : 0) | (p.F ? 8 : 0)]; }) };
+    if (withMatch) {
+      var L = function(l){ return [l.jammer, l.pivot].concat(l.blockers).map(function(id){ return id in idx ? idx[id] : -1; }); };
+      o.h = state.history.map(L);
+      o.c = L(state.current);
+      o.o = state.out.map(function(id){ return idx[id]; }).filter(function(x){ return x !== undefined; });
+    }
+    return b64url(JSON.stringify(o));
+  }
+  function decodeState(code){
+    var o = JSON.parse(unb64url(code));
+    if (!o || o.v !== 1 || !Array.isArray(o.r)) throw new Error("bad");
+    return o;
+  }
+  function applyImport(o){
+    var roster = o.r.map(function(x, i){ var f = +x[1] || 0; return { id: "p" + (i + 1), name: String(x[0]).slice(0, 40), J: !!(f & 1), P: !!(f & 2), B: !!(f & 4), F: !!(f & 8) }; });
+    function id(i){ return i >= 0 && i < roster.length ? roster[i].id : null; }
+    function line(a, jam){ return { jam: jam, jammer: id(a[0]), pivot: id(a[1]), blockers: [id(a[2]), id(a[3]), id(a[4])], forced: [], manual: [] }; }
+    state = { v: 3, match: String(o.m || "").slice(0, 60), roster: roster, nextId: roster.length + 1, history: [], box: [], star: null, out: [] };
+    if (Array.isArray(o.h)) {
+      state.history = o.h.map(function(a, i){ return line(a, i + 1); });
+      state.out = (o.o || []).map(id).filter(Boolean);
+      state.current = Array.isArray(o.c) ? line(o.c, state.history.length + 1) : compute(state.history, [], state.out);
+    } else state.current = compute([], [], []);
+  }
+  function codeFrom(text){
+    text = String(text || "").trim();
+    var i = text.indexOf("#import=");
+    return i >= 0 ? text.slice(i + 8) : text;
+  }
+  function linkFor(code){ return location.origin + location.pathname + "#import=" + code; }
+
+  var pending = null;
+  function askImport(code){
+    try { pending = decodeState(code); } catch (e) { pending = null; }
+    if (!pending) { $("importText").textContent = "Ce lien de transfert est illisible ou incomplet."; $("importYes").hidden = true; }
+    else {
+      var n = pending.r.length, j = Array.isArray(pending.h) ? pending.h.length : 0;
+      $("importText").textContent = "Importer « " + (pending.m || "Sans nom") + " » : " + n + " joueuse" + (n > 1 ? "s" : "")
+        + (j ? ", " + j + " jam" + (j > 1 ? "s" : "") + " joué" + (j > 1 ? "s" : "") : ", sans match en cours")
+        + " ? Ça remplace le roster et le match de ce téléphone.";
+      $("importYes").hidden = false;
+    }
+    $("importAsk").hidden = false;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  function closeImport(){
+    pending = null; $("importAsk").hidden = true;
+    if (location.hash.indexOf("#import=") === 0) history.replaceState(null, "", location.pathname + location.search);
+  }
+  $("importYes").addEventListener("click", function(){
+    if (pending) { applyImport(pending); swapFor = null; delAsk = null; renderAll(); setPrepOpen(true); }
+    closeImport();
+  });
+  $("importNo").addEventListener("click", closeImport);
+  $("importForm").addEventListener("submit", function(e){
+    e.preventDefault();
+    var code = codeFrom($("importCode").value);
+    if (!code) { $("importCode").focus(); return; }
+    $("importCode").value = "";
+    askImport(code);
+  });
+
+  var currentLink = "";
+  Array.prototype.forEach.call(document.querySelectorAll("[data-share]"), function(b){
+    b.addEventListener("click", function(){
+      var withMatch = b.getAttribute("data-share") === "match";
+      currentLink = linkFor(encodeState(withMatch));
+      $("shareLink").value = currentLink;
+      var qrOk = false;
+      try {
+        if (window.qrcode) {
+          var q = qrcode(0, "L"); q.addData(currentLink, "Byte"); q.make();
+          $("qr").innerHTML = q.createSvgTag({ cellSize: 4, margin: 2, scalable: true });
+          qrOk = true;
+        }
+      } catch (e) {}
+      $("qr").hidden = !qrOk;
+      $("shareHint").textContent = qrOk
+        ? "Scanne ce QR code avec l'appareil photo de l'autre téléphone, ou envoie-lui le lien. Si l'appli est installée sur son écran d'accueil, qu'elle colle le lien dans « Importer »."
+        : "Trop de données pour un QR code : envoie le lien à l'autre téléphone.";
+      $("copyLink").textContent = "Copier le lien";
+      $("shareSend").hidden = !navigator.share;
+      $("shareOut").hidden = false;
+    });
+  });
+  $("copyLink").addEventListener("click", function(){
+    var btn = $("copyLink");
+    function done(){ btn.textContent = "Lien copié ✓"; }
+    function fallback(){ var i = $("shareLink"); i.focus(); i.select(); try { if (document.execCommand("copy")) done(); } catch (e) {} }
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(currentLink).then(done, fallback); else fallback();
+  });
+  $("shareSend").addEventListener("click", function(){
+    navigator.share({ title: "Line-Up RDRM", text: "Roster pour Line-Up RDRM", url: currentLink }).catch(function(){});
+  });
+  $("shareClose").addEventListener("click", function(){ $("shareOut").hidden = true; });
+
+  function checkHash(){ if (location.hash.indexOf("#import=") === 0) askImport(location.hash.slice(8)); }
+  window.addEventListener("hashchange", checkHash);
+
+  if ("serviceWorker" in navigator && location.protocol === "https:") {
+    window.addEventListener("load", function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); });
+  }
+
+  setPrepOpen(state.history.length === 0);
+  renderAll();
+  checkHash();
+})();
+</script>
+
+</body></html>
