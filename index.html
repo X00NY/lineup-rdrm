@@ -120,6 +120,10 @@ input[type=text]:focus{outline:none; border-color:var(--accent)}
 .next .row{align-items:center; gap:12px; min-height:44px; padding:6px 16px}
 .next .name{font-size:16px; font-weight:600}
 .changed{color:var(--box)}
+.bench-head{border-top:2px solid var(--fresh); background:var(--fresh-soft); color:var(--fresh); padding:8px 16px 2px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase}
+.next .row.bench{background:var(--fresh-soft); border-top:0}
+.next .row.bench .name{color:var(--fresh); font-weight:700}
+.tag.benched{background:var(--fresh); border-color:var(--fresh); color:var(--surface)}
 
 .bar{position:fixed; left:0; right:0; bottom:0; padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background:var(--bg); border-top:1px solid var(--line)}
 .bar-in{max-width:520px; margin:0 auto; display:flex; gap:10px}
@@ -251,6 +255,8 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
       <li>Toujours 1 faucheuse (Fau) maximum par mur (pivot + bloqueuses). Les faucheuses jouent environ 6 jams sur 7, à tour de rôle.</li>
       <li>Toujours 1 Front (F) maximum par mur, pivot comprise. Si l'effectif ne le permet plus (absences, prisons), la ligne est quand même complétée, et ⇄ signale « 2 FRONT ».</li>
       <li>Chaque poste passe par ordre : pas jouée au jam d'avant, puis moins de jams joués à ce poste, puis repos le plus long.</li>
+      <li>Si une Front est disponible, chaque mur en a une, en priorité sur l'équilibre du temps de jeu.</li>
+      <li>Quand des prisons changent la ligne suivante, « Reste au banc » indique qui était prévue sans les prisons et ne joue plus.</li>
       <li>Une joueuse en prison repart au jam suivant au poste qu'elle occupait. Celle qui lui cède sa place passe en priorité ensuite.</li>
       <li>S (star pass) sur une pivot en prison : elle avait pris l'étoile, donc elle repart au jam suivant comme jammeuse. Si l'ancienne jammeuse est aussi en prison, elle repart comme bloqueuse.</li>
       <li>J, P et B dans « Préparer le match » disent à quels postes une joueuse entre dans la rotation automatique. Ajoute J à une bloqueuse s'il ne reste que 2 jammeuses.</li>
@@ -356,6 +362,11 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     function fauRank(){ return rankFor("B", pool("B").filter(isF), st, prev); }
     function confRank(){ return rankFor("B", pool("B").filter(function(n){ return !isF(n); }), st, prev); }
     var hasFresh = isF(pivot) || blockers.some(isF);
+    // a Front in every wall whenever one is available, before balancing the blockers' jams
+    if (slots > 0 && !(isFr(pivot) || blockers.some(isFr))) {
+      var fp = rankFor("B", pool("B").filter(isFr), st, prev).filter(function(n){ return !(hasFresh && isF(n)); })[0];
+      if (fp) { take(fp); if (isF(fp)) hasFresh = true; }
+    }
     var freshUsed = history.filter(function(l){ return wallOf(l).some(isF); }).length;
     var target = Math.ceil(jamNo * FRESH_PER_7 / 7);
     if (!hasFresh && slots > 0 && freshUsed < target) {
@@ -411,7 +422,8 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     if (p) {
       var c = candidates(cur, p);
       var free = c.ok.filter(function(n){ return !posOf(cur, n) && (p === "J" || freshCountAfter(cur, p, n) <= 1); });
-      var pick = free.filter(function(n){ return p === "J" || frontCountAfter(cur, p, n) <= 1; })[0] || free[0];
+      var pick = free.filter(function(n){ return p === "J" || frontCountAfter(cur, p, n) === 1; })[0]
+        || free.filter(function(n){ return p === "J" || frontCountAfter(cur, p, n) <= 1; })[0] || free[0];
       if (pick) applySwap(cur, p, pick); else setPos(cur, p, null);
     }
     state.box = state.box.filter(function(b){ return b !== id; });
@@ -570,7 +582,12 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     var hist = state.history.concat([cur]);
     var next = compute(hist, state.box, state.out, state.star);
     var base = state.box.length ? compute(hist, [], state.out) : null;
-    $("next").innerHTML = positions().map(function(p){ return nextRow(p, next, base); }).join("");
+    var benched = base ? playersOf(base).filter(function(id){ return playersOf(next).indexOf(id) < 0; }) : [];
+    $("next").innerHTML = positions().map(function(p){ return nextRow(p, next, base); }).join("")
+      + (benched.length ? '<div class="bench-head" role="status">Prévue' + (benched.length > 1 ? 's' : '') + ' sans les prisons : reste' + (benched.length > 1 ? 'nt' : '') + ' au banc</div>'
+        + benched.map(function(id){
+          return '<div class="row bench">' + roleCell(roleOf(base, id)) + '<span class="name" title="' + esc(nameOf(id)) + '">' + esc(nameOf(id)) + '</span><span class="tags"><span class="tag benched">BANC</span></span></div>';
+        }).join("") : "");
     $("nextHint").textContent = state.box.length ? state.box.length + " en prison pris en compte" : "si personne en prison";
     $("go").textContent = state.box.length ? "Fin du jam · " + state.box.length + " en prison →" : "Fin du jam → ligne suivante";
 
