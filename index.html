@@ -120,10 +120,9 @@ input[type=text]:focus{outline:none; border-color:var(--accent)}
 .next .row{align-items:center; gap:12px; min-height:44px; padding:6px 16px}
 .next .name{font-size:16px; font-weight:600}
 .changed{color:var(--box)}
-.bench-head{border-top:2px solid var(--fresh); background:var(--fresh-soft); color:var(--fresh); padding:8px 16px 2px; font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase}
-.next .row.bench{background:var(--fresh-soft); border-top:0}
-.next .row.bench .name{color:var(--fresh); font-weight:700}
-.tag.benched{background:var(--fresh); border-color:var(--fresh); color:var(--surface)}
+.who{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px}
+.who .name{flex:none}
+.stay{font-size:13px; font-weight:700; color:var(--fresh); white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 
 .bar{position:fixed; left:0; right:0; bottom:0; padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px)); background:var(--bg); border-top:1px solid var(--line)}
 .bar-in{max-width:520px; margin:0 auto; display:flex; gap:10px}
@@ -256,7 +255,7 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
       <li>Toujours 1 Front (F) maximum par mur, pivot comprise. Si l'effectif ne le permet plus (absences, prisons), la ligne est quand même complétée, et ⇄ signale « 2 FRONT ».</li>
       <li>Chaque poste passe par ordre : pas jouée au jam d'avant, puis moins de jams joués à ce poste, puis repos le plus long.</li>
       <li>Si une Front est disponible, chaque mur en a une, en priorité sur l'équilibre du temps de jeu.</li>
-      <li>Quand des prisons changent la ligne suivante, « Reste au banc » indique qui était prévue sans les prisons et ne joue plus.</li>
+      <li>Quand des prisons changent la ligne suivante, « X reste au banc » s'affiche sous la joueuse qui prend sa place : X était prévue sans les prisons et ne joue plus.</li>
       <li>Une joueuse en prison repart au jam suivant au poste qu'elle occupait. Celle qui lui cède sa place passe en priorité ensuite.</li>
       <li>S (star pass) sur une pivot en prison : elle avait pris l'étoile, donc elle repart au jam suivant comme jammeuse. Si l'ancienne jammeuse est aussi en prison, elle repart comme bloqueuse.</li>
       <li>J, P et B dans « Préparer le match » disent à quels postes une joueuse entre dans la rotation automatique. Ajoute J à une bloqueuse s'il ne reste que 2 jammeuses.</li>
@@ -563,10 +562,33 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     if (!c.ok.length && !c.other.length) h += '<span class="hint">Personne de disponible.</span>';
     return h + '</div></div>';
   }
-  function nextRow(p, line, base){
+  // Pairs each player who was planned (base = line without the box) but no longer plays
+  // with the newcomer who takes her spot: same role first, then box returns, then any newcomer.
+  function benchMap(next, base){
+    var map = {};
+    if (!base) return map;
+    var nextIds = playersOf(next), baseIds = playersOf(base);
+    var benched = baseIds.filter(function(id){ return nextIds.indexOf(id) < 0; });
+    var newcomers = nextIds.filter(function(id){ return baseIds.indexOf(id) < 0; });
+    var left = [];
+    benched.forEach(function(b){
+      var r = roleOf(base, b);
+      var m = newcomers.filter(function(n){ return !map[n] && roleOf(next, n) === r; })[0];
+      if (m) map[m] = [b]; else left.push(b);
+    });
+    left.forEach(function(b){
+      var m = newcomers.filter(function(n){ return !map[n] && next.forced.indexOf(n) >= 0; })[0]
+        || newcomers.filter(function(n){ return !map[n]; })[0]
+        || newcomers[0] || nextIds[0];
+      if (m) (map[m] = map[m] || []).push(b);
+    });
+    return map;
+  }
+  function nextRow(p, line, base, bench){
     var id = getPos(line, p);
     var changed = id && base && playersOf(base).indexOf(id) < 0;
-    return '<div class="row">' + roleCell(p[0]) + '<span class="name' + (changed ? ' changed' : '') + (id ? '' : ' none') + '"' + (id ? ' title="' + esc(nameOf(id)) + '"' : '') + '>' + (id ? esc(nameOf(id)) : 'Personne') + '</span><span class="tags">' + (id ? tagsFor(line, id) : '') + '</span></div>';
+    var stay = (id && bench[id]) ? bench[id].map(function(b){ return '<span class="stay" title="' + esc(nameOf(b)) + ' reste au banc">' + esc(nameOf(b)) + ' reste au banc</span>'; }).join("") : "";
+    return '<div class="row">' + roleCell(p[0]) + '<span class="who"><span class="name' + (changed ? ' changed' : '') + (id ? '' : ' none') + '"' + (id ? ' title="' + esc(nameOf(id)) + '"' : '') + '>' + (id ? esc(nameOf(id)) : 'Personne') + '</span>' + stay + '</span><span class="tags">' + (id ? tagsFor(line, id) : '') + '</span></div>';
   }
 
   function renderMain(){
@@ -582,12 +604,8 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     var hist = state.history.concat([cur]);
     var next = compute(hist, state.box, state.out, state.star);
     var base = state.box.length ? compute(hist, [], state.out) : null;
-    var benched = base ? playersOf(base).filter(function(id){ return playersOf(next).indexOf(id) < 0; }) : [];
-    $("next").innerHTML = positions().map(function(p){ return nextRow(p, next, base); }).join("")
-      + (benched.length ? '<div class="bench-head" role="status">Prévue' + (benched.length > 1 ? 's' : '') + ' sans les prisons : reste' + (benched.length > 1 ? 'nt' : '') + ' au banc</div>'
-        + benched.map(function(id){
-          return '<div class="row bench">' + roleCell(roleOf(base, id)) + '<span class="name" title="' + esc(nameOf(id)) + '">' + esc(nameOf(id)) + '</span><span class="tags"><span class="tag benched">BANC</span></span></div>';
-        }).join("") : "");
+    var bench = benchMap(next, base);
+    $("next").innerHTML = positions().map(function(p){ return nextRow(p, next, base, bench); }).join("");
     $("nextHint").textContent = state.box.length ? state.box.length + " en prison pris en compte" : "si personne en prison";
     $("go").textContent = state.box.length ? "Fin du jam · " + state.box.length + " en prison →" : "Fin du jam → ligne suivante";
 
