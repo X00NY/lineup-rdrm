@@ -190,6 +190,14 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
         <input type="text" id="newName" maxlength="40" autocomplete="off" placeholder="Nom de derby" aria-label="Nom de la nouvelle joueuse">
         <button class="ghost" type="submit">Ajouter</button>
       </form>
+      <div class="reset" style="padding:0 16px 12px">
+        <button type="button" class="ghost" id="seedAsk">Roster de base</button>
+        <span id="seedConfirm" hidden>
+          <span class="hint">Remplacer le roster et effacer le match en cours ?</span>
+          <button type="button" class="ghost danger" id="seedYes">Oui, remplacer</button>
+          <button type="button" class="ghost" id="seedNo">Non</button>
+        </span>
+      </div>
       <div id="prepWarn"></div>
       <div class="xfer">
         <span class="flabel">Passer le relais à un autre téléphone</span>
@@ -286,12 +294,15 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
   var KEY = "lineup-derby-v3", OLD_KEY = "lineup-amiens-v2";
   var ROLE_LABEL = { J: "Jammeuse", P: "Pivot", B: "Bloqueuse" };
   function roleCell(k){ return '<span class="role" title="' + ROLE_LABEL[k] + '" aria-label="' + ROLE_LABEL[k] + '">' + k + '</span>'; }
+  // Base roster. Bump `version` when it changes: phones with no match in progress pick it up on next opening.
   var SEED = {
+    version: 2,
     match: "Match à Amiens",
-    jammers: ["Redrum", "Motta", "PlumpQueen"],
-    pivots: ["Clatapulte", "Seg"],
-    confirmed: ["ChatonBrutal", "NonoPasaran", "Mad'Laine", "Mel Give Some", "Mrs Bungle"],
-    fresh: ["Freddie Stardust", "Coronasaurus", "Kill Boulette"]
+    jammers: ["Jen", "Motta", "Mariam"],
+    pivots: ["Seg", "Clara"],
+    confirmed: ["Barbie", "Mel", "Céline"],
+    fronts: ["Nono", "Chaton"],
+    fresh: ["Freddie", "Coro", "Kill"]
   };
 
   var state, swapFor = null, delAsk = null;
@@ -430,15 +441,16 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
   }
 
   // ---------- state ----------
-  function seedRoster(roles){
-    var list = [], id = 1;
-    SEED.jammers.concat(SEED.pivots, SEED.confirmed, SEED.fresh).forEach(function(n){
+  function seedRoster(roles, startId){
+    var list = [], id = startId || 1;
+    SEED.jammers.concat(SEED.pivots, SEED.confirmed, SEED.fronts, SEED.fresh).forEach(function(n){
       var r = roles && roles[n];
       list.push({ id: "p" + id++, name: n,
         J: r ? !!r.J : SEED.jammers.indexOf(n) >= 0,
         P: r ? !!r.P : SEED.pivots.indexOf(n) >= 0,
-        B: r ? !!r.B : SEED.confirmed.indexOf(n) >= 0 || SEED.fresh.indexOf(n) >= 0,
-        F: SEED.fresh.indexOf(n) >= 0 });
+        B: r ? !!r.B : SEED.confirmed.indexOf(n) >= 0 || SEED.fronts.indexOf(n) >= 0 || SEED.fresh.indexOf(n) >= 0,
+        F: SEED.fresh.indexOf(n) >= 0,
+        Fr: SEED.fronts.indexOf(n) >= 0 });
     });
     return { roster: list, nextId: id };
   }
@@ -458,14 +470,32 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
   function load(){
     try {
       var raw = localStorage.getItem(KEY);
-      if (raw) { var s = JSON.parse(raw); if (s && s.v === 3 && Array.isArray(s.roster) && s.current && Array.isArray(s.history)) { state = s; return; } }
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (s && s.v === 3 && Array.isArray(s.roster) && s.current && Array.isArray(s.history)) {
+          state = s;
+          if (state.seed !== SEED.version) {
+            // new base roster: apply it only if no jam has been played yet
+            if (!state.history.length) resetToSeed();
+            state.seed = SEED.version;
+          }
+          return;
+        }
+      }
     } catch (e) {}
     try {
       var old = localStorage.getItem(OLD_KEY);
       if (old) { var o = JSON.parse(old); if (o && o.current && Array.isArray(o.history) && o.roles) { migrate(o); return; } }
     } catch (e) {}
     var seed = seedRoster();
-    state = { v: 3, match: SEED.match, roster: seed.roster, nextId: seed.nextId, history: [], box: [], out: [] };
+    state = { v: 3, seed: SEED.version, match: SEED.match, roster: seed.roster, nextId: seed.nextId, history: [], box: [], out: [] };
+    state.current = compute([], [], []);
+  }
+  // Replaces the roster with the base roster and clears the match (fresh ids so no old stat is mixed in).
+  function resetToSeed(){
+    var seed = seedRoster(null, state.nextId || 1);
+    state.roster = seed.roster; state.nextId = seed.nextId;
+    state.history = []; state.box = []; state.star = null; state.out = [];
     state.current = compute([], [], []);
   }
   function save(){ try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
@@ -744,6 +774,13 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     renderAll();
   });
 
+  $("seedAsk").addEventListener("click", function(){ $("seedConfirm").hidden = false; $("seedAsk").hidden = true; });
+  $("seedNo").addEventListener("click", function(){ $("seedConfirm").hidden = true; $("seedAsk").hidden = false; });
+  $("seedYes").addEventListener("click", function(){
+    resetToSeed(); swapFor = null; delAsk = null;
+    $("seedConfirm").hidden = true; $("seedAsk").hidden = false;
+    renderAll();
+  });
   $("resetAsk").addEventListener("click", function(){ $("resetConfirm").hidden = false; $("resetAsk").hidden = true; });
   $("resetNo").addEventListener("click", function(){ $("resetConfirm").hidden = true; $("resetAsk").hidden = false; });
   $("resetYes").addEventListener("click", function(){
