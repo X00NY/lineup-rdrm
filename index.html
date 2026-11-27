@@ -251,7 +251,7 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     </button>
     <div id="rulesBody" hidden>
     <ul class="rules">
-      <li>Toujours 1 faucheuse (Fau) maximum par mur (pivot + bloqueuses). Les faucheuses jouent environ 6 jams sur 7, à tour de rôle.</li>
+      <li>Une faucheuse (Fau) sur chaque mur dès qu'il y en a une disponible, et jamais plus d'une (pivot + bloqueuses). Les faucheuses tournent entre elles ; les autres bloqueuses complètent le mur.</li>
       <li>Toujours 1 Front (F) maximum par mur, pivot comprise. Si l'effectif ne le permet plus (absences, prisons), la ligne est quand même complétée, et ⇄ signale « 2 FRONT ».</li>
       <li>Chaque poste passe par ordre : pas jouée au jam d'avant, puis moins de jams joués à ce poste, puis repos le plus long.</li>
       <li>Si une Front est disponible, chaque mur en a une, en priorité sur l'équilibre du temps de jeu.</li>
@@ -284,7 +284,6 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
 <script>
 (function(){
   var KEY = "lineup-derby-v3", OLD_KEY = "lineup-amiens-v2";
-  var FRESH_PER_7 = 6;
   var ROLE_LABEL = { J: "Jammeuse", P: "Pivot", B: "Bloqueuse" };
   function roleCell(k){ return '<span class="role" title="' + ROLE_LABEL[k] + '" aria-label="' + ROLE_LABEL[k] + '">' + k + '</span>'; }
   var SEED = {
@@ -363,20 +362,18 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     var hasFresh = isF(pivot) || blockers.some(isF);
     // a Front in every wall whenever one is available, before balancing the blockers' jams
     if (slots > 0 && !(isFr(pivot) || blockers.some(isFr))) {
-      var fp = rankFor("B", pool("B").filter(isFr), st, prev).filter(function(n){ return !(hasFresh && isF(n)); })[0];
+      var fronts = rankFor("B", pool("B").filter(isFr), st, prev).filter(function(n){ return !(hasFresh && isF(n)); });
+      // if the only Faus left are Fronts, take a Fau-Front so the wall still gets its Fau
+      var fauNotFront = pool("B").some(function(n){ return isF(n) && !isFr(n); });
+      var fp = (!hasFresh && !fauNotFront ? fronts.filter(isF)[0] : null) || fronts[0];
       if (fp) { take(fp); if (isF(fp)) hasFresh = true; }
     }
-    var freshUsed = history.filter(function(l){ return wallOf(l).some(isF); }).length;
-    var target = Math.ceil(jamNo * FRESH_PER_7 / 7);
-    if (!hasFresh && slots > 0 && freshUsed < target) {
+    // then a Fau in every wall whenever one is available, before balancing the other blockers' jams
+    if (!hasFresh && slots > 0) {
       var f = fauRank().filter(frontOk)[0];
       if (f) { take(f); hasFresh = true; }
     }
     confRank().forEach(function(x){ if (slots > 0 && frontOk(x)) take(x); });
-    if (slots > 0 && !hasFresh) {
-      var f2 = fauRank().filter(frontOk)[0];
-      if (f2) { take(f2); hasFresh = true; }
-    }
     // last resort, when there aren't enough players to respect the Front rule
     confRank().forEach(function(x){ if (slots > 0) take(x); });
     if (slots > 0 && !hasFresh) { var f3 = fauRank()[0]; if (f3) take(f3); }
@@ -421,8 +418,10 @@ tr.out .pn{text-decoration:line-through; color:var(--muted)}
     if (p) {
       var c = candidates(cur, p);
       var free = c.ok.filter(function(n){ return !posOf(cur, n) && (p === "J" || freshCountAfter(cur, p, n) <= 1); });
-      var pick = free.filter(function(n){ return p === "J" || frontCountAfter(cur, p, n) === 1; })[0]
-        || free.filter(function(n){ return p === "J" || frontCountAfter(cur, p, n) <= 1; })[0] || free[0];
+      // keep 1 Front and 1 Fau on the wall when possible
+      function fits(n, fr, fau){ return p === "J" || ((!fr || frontCountAfter(cur, p, n) === 1) && (!fau || freshCountAfter(cur, p, n) === 1) && frontCountAfter(cur, p, n) <= 1); }
+      var pick = free.filter(function(n){ return fits(n, true, true); })[0] || free.filter(function(n){ return fits(n, true, false); })[0]
+        || free.filter(function(n){ return fits(n, false, true); })[0] || free.filter(function(n){ return fits(n, false, false); })[0] || free[0];
       if (pick) applySwap(cur, p, pick); else setPos(cur, p, null);
     }
     state.box = state.box.filter(function(b){ return b !== id; });
